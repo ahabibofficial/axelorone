@@ -1,0 +1,65 @@
+apply plugin: 'axelor-app'
+
+def modules = new File('modules/abs').listFiles().findAll { dir ->
+	new File(dir, 'build.gradle').exists()
+}
+
+def enModules = new File('modules/abs').listFiles().findAll { dir ->
+	new File(dir, 'build.gradle').exists() && !dir.name.endsWith('-demo-fr') && !dir.name.endsWith('-l10n-fr')
+}
+
+def frModules = new File('modules/abs').listFiles().findAll { dir ->
+	new File(dir, 'build.gradle').exists() && !dir.name.endsWith('-demo-en') && !dir.name.endsWith('-l10n-en')
+}
+
+def installedModules = project.hasProperty('lang') && project.getProperty('lang') == 'fr' ? frModules : enModules
+
+application {
+
+	name "axelor-erp"
+	title "Axelor :: ERP"
+	
+	version "3.0.4"
+	
+	// ADK version required
+	adkVersion "~3.3.1"
+
+	// depends on all modules
+	modules.each { dir ->
+		module "modules:$dir.name"
+	}
+	
+	// install all modules
+	installedModules.each { dir ->
+			install "$dir.name"
+	}
+	
+}
+
+tomcat {
+	httpPort = project.properties.get("http.port", 8080) as Integer
+	stopPort = 9451
+}
+
+task("dataImport", type: JavaExec) {
+	main = "com.axelor.apps.erp.Main"
+	classpath = sourceSets.main.runtimeClasspath
+	if(System.getProperty("exec.args") != null) {
+		args System.getProperty("exec.args").split()
+	}
+}
+
+build.doLast{
+	archiveReports.execute()
+}
+
+task archiveReports(type: Zip){
+	from 'modules/abs'
+    include '*/src/main/resources/reports/*'
+	classifier 'reports'
+	eachFile { fileCopyDetails ->
+		fileCopyDetails.path = fileCopyDetails.path.replaceAll(".*/src/main/resources/reports/", '')
+	}
+	includeEmptyDirs = false
+	destinationDir = new File("$buildDir/libs")
+}
